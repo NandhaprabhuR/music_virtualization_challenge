@@ -103,6 +103,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
   int _currentLyricIndex = -1;
   List<_SyncedLine>? _cachedSyncedLines;
   StreamSubscription<AudioPlayerState>? _audioSub;
+  StreamSubscription<TrackDetailState>? _detailSub;
 
   @override
   void initState() {
@@ -113,12 +114,28 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
         context.read<AudioPlayerCubit>().playUrl(widget.track.preview);
       });
     }
-    // Listen to audio position changes for synced lyrics
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Listen for lyrics data so we eagerly parse synced lines
+      _detailSub = context.read<TrackDetailBloc>().stream.listen((detailState) {
+        if (!mounted) return;
+        if (detailState is TrackDetailLoadedState &&
+            detailState.lyrics != null &&
+            detailState.lyrics!.syncedLyrics.isNotEmpty &&
+            _cachedSyncedLines == null) {
+          setState(() {
+            _cachedSyncedLines =
+                _parseSyncedLyrics(detailState.lyrics!.syncedLyrics);
+          });
+        }
+      });
+      // Listen to audio position changes for synced lyrics
       _audioSub = context.read<AudioPlayerCubit>().stream.listen((audioState) {
         if (!mounted) return;
         if (_cachedSyncedLines != null && _cachedSyncedLines!.isNotEmpty) {
-          final newIndex = _findCurrentLineIndex(_cachedSyncedLines!, audioState.position);
+          final newIndex = _findCurrentLineIndex(
+            _cachedSyncedLines!,
+            audioState.position,
+          );
           if (newIndex != _currentLyricIndex) {
             setState(() {
               _currentLyricIndex = newIndex;
@@ -135,6 +152,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
   @override
   void dispose() {
     _audioSub?.cancel();
+    _detailSub?.cancel();
     _tabController.dispose();
     _lyricsScrollController.dispose();
     super.dispose();
@@ -197,7 +215,13 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
             return _buildLoadingState(context);
           }
           if (state is TrackDetailNoInternetState) {
-            return const SafeArea(child: NoInternetWidget());
+            return SafeArea(
+              child: NoInternetWidget(
+                onRetry: () => context.read<TrackDetailBloc>().add(
+                  FetchTrackDetailEvent(trackId: widget.track.id),
+                ),
+              ),
+            );
           }
           if (state is TrackDetailErrorState) {
             return _buildErrorState(context, state.message);
@@ -833,8 +857,8 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
                 color: isActive
                     ? context.accent
                     : isPast
-                        ? context.textPrimary.withValues(alpha: 0.35)
-                        : context.textPrimary.withValues(alpha: 0.6),
+                    ? context.textPrimary.withValues(alpha: 0.35)
+                    : context.textPrimary.withValues(alpha: 0.6),
                 fontSize: isActive ? 26 : 20,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                 height: 1.4,

@@ -87,12 +87,20 @@ class AudioPlayerCubit extends Cubit<AudioPlayerState> {
       await _player.play();
       emit(state.copyWith(status: PlaybackStatus.playing));
     } catch (e) {
-      emit(
-        state.copyWith(
-          status: PlaybackStatus.error,
-          error: 'Could not play audio',
-        ),
-      );
+      // Retry once on failure (Deezer preview URLs can return 403 transiently)
+      try {
+        await Future.delayed(const Duration(milliseconds: 500));
+        await _player.setUrl(url);
+        await _player.play();
+        emit(state.copyWith(status: PlaybackStatus.playing));
+      } catch (_) {
+        emit(
+          state.copyWith(
+            status: PlaybackStatus.error,
+            error: 'Preview unavailable – try another track',
+          ),
+        );
+      }
     }
   }
 

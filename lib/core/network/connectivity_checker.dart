@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 abstract class ConnectivityChecker {
@@ -14,7 +16,22 @@ class ConnectivityCheckerImpl implements ConnectivityChecker {
   @override
   Future<bool> get isConnected async {
     final results = await _connectivity.checkConnectivity();
-    return _hasConnection(results);
+    final hasConn = _hasConnection(results);
+    if (hasConn) return true;
+    // Fallback: connectivity_plus can be unreliable on emulators,
+    // so do a real DNS lookup to verify.
+    return _realReachabilityCheck();
+  }
+
+  /// Performs a real DNS lookup to check if the device can reach the internet.
+  Future<bool> _realReachabilityCheck() async {
+    try {
+      final result = await InternetAddress.lookup('google.com')
+          .timeout(const Duration(seconds: 3));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
