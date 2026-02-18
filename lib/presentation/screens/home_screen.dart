@@ -5,6 +5,7 @@ import 'package:untitled1/core/theme/app_theme.dart';
 import 'package:untitled1/presentation/blocs/now_playing/now_playing_cubit.dart';
 import 'package:untitled1/presentation/screens/library_screen.dart';
 import 'package:untitled1/presentation/screens/now_playing_screen.dart';
+import 'package:untitled1/presentation/widgets/mini_player_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,51 +24,59 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: context.bg,
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: context.isDark ? const Color(0xFF0A0A0A) : Colors.white,
-          border: Border(top: BorderSide(color: context.dividerColor)),
-          boxShadow: context.isDark
-              ? null
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 60,
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildNavItem(
-                    index: 0,
-                    icon: Icons.library_music_outlined,
-                    activeIcon: Icons.library_music_rounded,
-                    label: 'Library',
-                  ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Mini player - only show on Library tab
+          if (_currentIndex == 0)
+            MiniPlayerWidget(onTap: () => setState(() => _currentIndex = 1)),
+          Container(
+            decoration: BoxDecoration(
+              color: context.isDark ? const Color(0xFF0A0A0A) : Colors.white,
+              border: Border(top: BorderSide(color: context.dividerColor)),
+              boxShadow: context.isDark
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 60,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildNavItem(
+                        index: 0,
+                        icon: Icons.library_music_outlined,
+                        activeIcon: Icons.library_music_rounded,
+                        label: 'Library',
+                      ),
+                    ),
+                    Expanded(
+                      child: BlocBuilder<NowPlayingCubit, NowPlayingState>(
+                        builder: (context, state) {
+                          return _buildNavItem(
+                            index: 1,
+                            icon: Icons.play_circle_outline_rounded,
+                            activeIcon: Icons.play_circle_filled_rounded,
+                            label: 'Now Playing',
+                            hasIndicator: state.currentTrack != null,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: BlocBuilder<NowPlayingCubit, NowPlayingState>(
-                    builder: (context, state) {
-                      return _buildNavItem(
-                        index: 1,
-                        icon: Icons.play_circle_outline_rounded,
-                        activeIcon: Icons.play_circle_filled_rounded,
-                        label: 'Now Playing',
-                        hasIndicator: state.currentTrack != null,
-                      );
-                    },
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

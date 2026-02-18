@@ -66,6 +66,17 @@ class AudioPlayerCubit extends Cubit<AudioPlayerState> {
         );
         _player.seek(Duration.zero);
         _player.pause();
+        return;
+      }
+
+      // Sync play/pause state from native player
+      if (playerState.processingState == ProcessingState.ready) {
+        if (playerState.playing && state.status == PlaybackStatus.paused) {
+          emit(state.copyWith(status: PlaybackStatus.playing));
+        } else if (!playerState.playing &&
+            state.status == PlaybackStatus.playing) {
+          emit(state.copyWith(status: PlaybackStatus.paused));
+        }
       }
     });
   }

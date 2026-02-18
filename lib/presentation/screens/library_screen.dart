@@ -97,19 +97,6 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   void _onTrackTap(Track track) {
     context.read<NowPlayingCubit>().selectTrack(track);
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Now playing: ${track.title}',
-          style: GoogleFonts.playfairDisplay(color: Colors.white),
-        ),
-        backgroundColor: context.accent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   @override

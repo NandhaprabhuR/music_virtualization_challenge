@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:untitled1/core/errors/exceptions.dart';
+import 'package:untitled1/domain/entities/lyrics.dart';
 import 'package:untitled1/domain/usecases/get_lyrics.dart';
 import 'package:untitled1/domain/usecases/get_track_details.dart';
 import 'package:untitled1/presentation/blocs/track_detail/track_detail_event.dart';
@@ -9,11 +10,17 @@ class TrackDetailBloc extends Bloc<TrackDetailEvent, TrackDetailState> {
   final GetTrackDetails getTrackDetails;
   final GetLyrics getLyrics;
 
+  /// In-memory lyrics cache keyed by "trackName|artistName"
+  static final Map<String, Lyrics> _lyricsCache = {};
+
   TrackDetailBloc({required this.getTrackDetails, required this.getLyrics})
     : super(const TrackDetailInitialState()) {
     on<FetchTrackDetailEvent>(_onFetchTrackDetail);
     on<FetchLyricsEvent>(_onFetchLyrics);
   }
+
+  static String _lyricsCacheKey(String trackName, String artistName) =>
+      '${trackName.toLowerCase()}|${artistName.toLowerCase()}';
 
   Future<void> _onFetchTrackDetail(
     FetchTrackDetailEvent event,
@@ -51,6 +58,15 @@ class TrackDetailBloc extends Bloc<TrackDetailEvent, TrackDetailState> {
     final currentState = state;
 
     if (currentState is TrackDetailLoadedState) {
+      final cacheKey = _lyricsCacheKey(event.trackName, event.artistName);
+
+      // Check cache first
+      final cached = _lyricsCache[cacheKey];
+      if (cached != null) {
+        emit(currentState.copyWith(lyrics: cached, isLyricsLoading: false));
+        return;
+      }
+
       emit(currentState.copyWith(isLyricsLoading: true, lyricsError: null));
 
       try {
@@ -60,6 +76,11 @@ class TrackDetailBloc extends Bloc<TrackDetailEvent, TrackDetailState> {
           albumName: event.albumName,
           duration: event.duration,
         );
+
+        // Cache the result
+        if (lyrics.hasLyrics) {
+          _lyricsCache[cacheKey] = lyrics;
+        }
 
         emit(currentState.copyWith(lyrics: lyrics, isLyricsLoading: false));
       } on NoInternetException {
