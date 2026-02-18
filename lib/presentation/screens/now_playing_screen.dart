@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 import 'package:untitled1/domain/entities/track.dart';
 import 'package:untitled1/domain/usecases/get_lyrics.dart';
@@ -66,7 +65,7 @@ class NowPlayingScreen extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               'No Track Selected',
-              style: GoogleFonts.playfairDisplay(
+              style: TextStyle(
                 color: context.textPrimary,
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -75,7 +74,7 @@ class NowPlayingScreen extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Select a track from the Library to see\ndetails and lyrics here.',
-              style: GoogleFonts.playfairDisplay(
+              style: TextStyle(
                 color: context.textSecondary,
                 fontSize: 14,
                 height: 1.5,
@@ -257,7 +256,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
           const SizedBox(height: 32),
           Text(
             widget.track.title,
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               color: context.textPrimary,
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -266,20 +265,14 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
           const SizedBox(height: 8),
           Text(
             widget.track.artistName,
-            style: GoogleFonts.playfairDisplay(
-              color: context.textSecondary,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: context.textSecondary, fontSize: 16),
           ),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.only(bottom: 40),
             child: Text(
               'Loading details...',
-              style: GoogleFonts.playfairDisplay(
-                color: context.textSecondary,
-                fontSize: 13,
-              ),
+              style: TextStyle(color: context.textSecondary, fontSize: 13),
             ),
           ),
         ],
@@ -297,10 +290,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
             const SizedBox(height: 16),
             Text(
               message,
-              style: GoogleFonts.playfairDisplay(
-                color: context.textSecondary,
-                fontSize: 15,
-              ),
+              style: TextStyle(color: context.textSecondary, fontSize: 15),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -309,10 +299,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
                 FetchTrackDetailEvent(trackId: widget.track.id),
               ),
               icon: Icon(Icons.refresh, color: context.accent),
-              label: Text(
-                'Retry',
-                style: GoogleFonts.playfairDisplay(color: context.accent),
-              ),
+              label: Text('Retry', style: TextStyle(color: context.accent)),
             ),
           ],
         ),
@@ -355,11 +342,11 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
               dividerColor: Colors.transparent,
               labelColor: Colors.white,
               unselectedLabelColor: context.textSecondary,
-              labelStyle: GoogleFonts.playfairDisplay(
+              labelStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
-              unselectedLabelStyle: GoogleFonts.playfairDisplay(
+              unselectedLabelStyle: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -440,14 +427,14 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
                   children: [
                     Text(
                       _formatDuration(audioState.position),
-                      style: GoogleFonts.playfairDisplay(
+                      style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 12,
                       ),
                     ),
                     Text(
                       _formatDuration(audioState.duration),
-                      style: GoogleFonts.playfairDisplay(
+                      style: TextStyle(
                         color: context.textSecondary,
                         fontSize: 12,
                       ),
@@ -580,7 +567,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
           const SizedBox(height: 28),
           Text(
             detail.title,
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               color: context.textPrimary,
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -592,7 +579,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
           const SizedBox(height: 6),
           Text(
             detail.artistName,
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               color: context.accent,
               fontSize: 17,
               fontWeight: FontWeight.w600,
@@ -601,10 +588,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
           const SizedBox(height: 4),
           Text(
             detail.albumTitle,
-            style: GoogleFonts.playfairDisplay(
-              color: context.textSecondary,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: context.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 24),
           Container(
@@ -666,7 +650,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
                 children: [
                   Text(
                     'Contributors',
-                    style: GoogleFonts.playfairDisplay(
+                    style: TextStyle(
                       color: context.textSecondary,
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -688,7 +672,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
                         ),
                         child: Text(
                           name,
-                          style: GoogleFonts.playfairDisplay(
+                          style: TextStyle(
                             color: context.accent,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -717,10 +701,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
             const SizedBox(height: 16),
             Text(
               'Loading lyrics...',
-              style: GoogleFonts.playfairDisplay(
-                color: context.textSecondary,
-                fontSize: 14,
-              ),
+              style: TextStyle(color: context.textSecondary, fontSize: 14),
             ),
           ],
         ),
@@ -737,7 +718,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
               const SizedBox(height: 16),
               Text(
                 'NO INTERNET CONNECTION',
-                style: GoogleFonts.playfairDisplay(
+                style: TextStyle(
                   color: context.accent,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -755,10 +736,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
             const SizedBox(height: 16),
             Text(
               state.lyricsError!,
-              style: GoogleFonts.playfairDisplay(
-                color: context.textSecondary,
-                fontSize: 15,
-              ),
+              style: TextStyle(color: context.textSecondary, fontSize: 15),
             ),
           ],
         ),
@@ -780,7 +758,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Text(
               line,
-              style: GoogleFonts.playfairDisplay(
+              style: TextStyle(
                 color: index == 0
                     ? context.textPrimary
                     : context.textPrimary.withValues(alpha: 0.6),
@@ -802,7 +780,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
           const SizedBox(height: 16),
           Text(
             'No lyrics available',
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               color: context.textPrimary.withValues(alpha: 0.5),
               fontSize: 18,
               fontWeight: FontWeight.w500,
@@ -811,10 +789,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
           const SizedBox(height: 8),
           Text(
             'Lyrics for this track could not be found.',
-            style: GoogleFonts.playfairDisplay(
-              color: context.textSecondary,
-              fontSize: 13,
-            ),
+            style: TextStyle(color: context.textSecondary, fontSize: 13),
           ),
         ],
       ),
@@ -828,10 +803,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
       return Center(
         child: Text(
           'No synced lyrics available',
-          style: GoogleFonts.playfairDisplay(
-            color: context.textSecondary,
-            fontSize: 15,
-          ),
+          style: TextStyle(color: context.textSecondary, fontSize: 15),
         ),
       );
     }
@@ -854,7 +826,7 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: AnimatedDefaultTextStyle(
               duration: const Duration(milliseconds: 300),
-              style: GoogleFonts.playfairDisplay(
+              style: TextStyle(
                 color: isActive
                     ? context.accent
                     : isPast
@@ -885,14 +857,11 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
         children: [
           Text(
             label,
-            style: GoogleFonts.playfairDisplay(
-              color: context.textSecondary,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: context.textSecondary, fontSize: 14),
           ),
           Text(
             value,
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               color: valueColor ?? context.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,

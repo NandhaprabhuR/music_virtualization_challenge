@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 
 class NoInternetWidget extends StatelessWidget {
@@ -19,7 +18,7 @@ class NoInternetWidget extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               'NO INTERNET CONNECTION',
-              style: GoogleFonts.playfairDisplay(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: context.textPrimary,
@@ -30,10 +29,7 @@ class NoInternetWidget extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               'Please check your internet connection and try again.',
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 14,
-                color: context.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: context.textSecondary),
               textAlign: TextAlign.center,
             ),
             if (onRetry != null) ...[
@@ -41,7 +37,7 @@ class NoInternetWidget extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: Text('Retry', style: GoogleFonts.playfairDisplay()),
+                label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: context.accent,
                   foregroundColor: Colors.white,

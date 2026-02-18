@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Brand colors
@@ -21,7 +20,7 @@ class AppTheme {
   static const Color lightSubtext = Color(0xFF757575);
 
   static TextTheme _buildTextTheme(TextTheme base) {
-    return GoogleFonts.playfairDisplayTextTheme(base);
+    return base;
   }
 
   static ThemeData darkTheme() {
@@ -37,15 +36,15 @@ class AppTheme {
         onPrimary: Colors.white,
       ),
       textTheme: _buildTextTheme(base.textTheme),
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: darkBg,
         elevation: 0,
-        titleTextStyle: GoogleFonts.playfairDisplay(
+        titleTextStyle: TextStyle(
           color: darkText,
           fontSize: 28,
           fontWeight: FontWeight.bold,
         ),
-        iconTheme: const IconThemeData(color: darkText),
+        iconTheme: IconThemeData(color: darkText),
       ),
       cardTheme: CardThemeData(
         color: darkCard,
@@ -77,15 +76,15 @@ class AppTheme {
         onPrimary: Colors.white,
       ),
       textTheme: _buildTextTheme(base.textTheme),
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: lightBg,
         elevation: 0,
-        titleTextStyle: GoogleFonts.playfairDisplay(
+        titleTextStyle: TextStyle(
           color: lightText,
           fontSize: 28,
           fontWeight: FontWeight.bold,
         ),
-        iconTheme: const IconThemeData(color: lightText),
+        iconTheme: IconThemeData(color: lightText),
       ),
       cardTheme: CardThemeData(
         color: lightCard,

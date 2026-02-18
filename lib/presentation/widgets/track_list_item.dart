@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 import 'package:untitled1/domain/entities/track.dart';
 
@@ -21,8 +20,9 @@ class TrackListItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -61,26 +61,36 @@ class TrackListItem extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     track.title,
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 16,
+                    style: TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: context.textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     track.artistName,
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 14,
+                    style: TextStyle(
+                      fontSize: 13,
                       color: context.textSecondary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'ID: ${track.id}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: context.textSecondary.withValues(alpha: 0.6),
+                    ),
+                    maxLines: 1,
                   ),
                 ],
               ),

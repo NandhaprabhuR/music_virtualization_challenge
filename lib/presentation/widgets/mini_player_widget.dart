@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 import 'package:untitled1/presentation/blocs/audio/audio_player_cubit.dart';
 import 'package:untitled1/presentation/blocs/now_playing/now_playing_cubit.dart';
@@ -104,7 +103,7 @@ class MiniPlayerWidget extends StatelessWidget {
                               children: [
                                 Text(
                                   track.title,
-                                  style: GoogleFonts.playfairDisplay(
+                                  style: TextStyle(
                                     color: context.textPrimary,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
@@ -115,7 +114,7 @@ class MiniPlayerWidget extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   track.artistName,
-                                  style: GoogleFonts.playfairDisplay(
+                                  style: TextStyle(
                                     color: context.textSecondary,
                                     fontSize: 12,
                                   ),

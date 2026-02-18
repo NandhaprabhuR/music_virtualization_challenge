@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 import 'package:untitled1/core/utils/debouncer.dart';
 import 'package:untitled1/domain/entities/track.dart';
@@ -75,8 +74,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     if (!_scrollController.hasClients) return false;
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
-    // Trigger when within 200px of the bottom
-    return currentScroll >= (maxScroll - 200);
+    // Trigger when within 500px of the bottom (pre-fetch early)
+    return currentScroll >= (maxScroll - 500);
   }
 
   void _onSearchChanged(String query) {
@@ -107,7 +106,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       appBar: AppBar(
         title: Text(
           'Library',
-          style: GoogleFonts.playfairDisplay(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             color: context.textPrimary,
             fontSize: 28,
@@ -133,7 +132,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ),
                       child: Text(
                         '${state.totalLoaded} tracks',
-                        style: GoogleFonts.playfairDisplay(
+                        style: TextStyle(
                           color: context.accent,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -258,10 +257,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               state.isSearchMode
                   ? 'No tracks found for "${state.searchQuery}"'
                   : 'No tracks available',
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 16,
-                color: context.textSecondary,
-              ),
+              style: TextStyle(fontSize: 16, color: context.textSecondary),
             ),
           ],
         ),
@@ -329,7 +325,7 @@ class _StickyHeaderListView extends StatefulWidget {
 
 class _StickyHeaderListViewState extends State<_StickyHeaderListView> {
   static const double _headerHeight = 48.0;
-  static const double _trackHeight = 72.0;
+  static const double _trackHeight = 96.0;
 
   /// Index into headerIndices for the currently stuck header.
   int _stuckSection = 0;
@@ -487,7 +483,7 @@ class _StickyHeaderListViewState extends State<_StickyHeaderListView> {
             child: Center(
               child: Text(
                 item.letter,
-                style: GoogleFonts.playfairDisplay(
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -498,7 +494,7 @@ class _StickyHeaderListViewState extends State<_StickyHeaderListView> {
           const SizedBox(width: 12),
           Text(
             '${item.count} tracks',
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               fontSize: 13,
               color: context.textSecondary,
               fontWeight: FontWeight.w500,

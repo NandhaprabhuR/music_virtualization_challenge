@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 
 class StickyHeaderWidget extends StatelessWidget {
@@ -30,7 +29,7 @@ class StickyHeaderWidget extends StatelessWidget {
             child: Center(
               child: Text(
                 letter,
-                style: GoogleFonts.playfairDisplay(
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -41,7 +40,7 @@ class StickyHeaderWidget extends StatelessWidget {
           const SizedBox(width: 12),
           Text(
             '$count tracks',
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               fontSize: 13,
               color: context.textSecondary,
               fontWeight: FontWeight.w500,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 
 class AppErrorWidget extends StatelessWidget {
@@ -20,10 +19,7 @@ class AppErrorWidget extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               message,
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 16,
-                color: context.textSecondary,
-              ),
+              style: TextStyle(fontSize: 16, color: context.textSecondary),
               textAlign: TextAlign.center,
             ),
             if (onRetry != null) ...[
@@ -31,7 +27,7 @@ class AppErrorWidget extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: Text('Retry', style: GoogleFonts.playfairDisplay()),
+                label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: context.accent,
                   foregroundColor: Colors.white,

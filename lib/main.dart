@@ -1,9 +1,6 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/network/connectivity_checker.dart';
 import 'package:untitled1/core/network/dio_client.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
@@ -78,21 +75,6 @@ Future<void> setupDependencies() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Allow Google Fonts to fetch over network, but silently swallow errors
-  // when fonts.gstatic.com is unreachable (falls back to system font).
-  GoogleFonts.config.allowRuntimeFetching = true;
-
-  // Catch unhandled async errors from google_fonts font loading
-  PlatformDispatcher.instance.onError = (error, stack) {
-    if (error.toString().contains('google_fonts') ||
-        error.toString().contains('fonts.gstatic.com') ||
-        error.toString().contains('Failed to load font')) {
-      // Silently ignore — system font will be used as fallback
-      return true;
-    }
-    return false; // Let other errors propagate normally
-  };
 
   // Initialize Hive
   await HiveInit.init();

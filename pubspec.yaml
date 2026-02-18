@@ -41,7 +41,6 @@ dependencies:
   get_it: ^8.0.2
   cached_network_image: ^3.4.1
   just_audio: ^0.10.5
-  google_fonts: ^8.0.1
 
 dev_dependencies:
   flutter_test:

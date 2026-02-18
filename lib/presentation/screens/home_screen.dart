@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 import 'package:untitled1/presentation/blocs/now_playing/now_playing_cubit.dart';
 import 'package:untitled1/presentation/screens/library_screen.dart';
@@ -122,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 4),
           Text(
             label,
-            style: GoogleFonts.playfairDisplay(
+            style: TextStyle(
               color: isSelected ? context.accent : context.textSecondary,
               fontSize: 11,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,

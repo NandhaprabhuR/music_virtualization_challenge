@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 
 class LoadingWidget extends StatelessWidget {
@@ -17,10 +16,7 @@ class LoadingWidget extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             message,
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 16,
-              color: context.textSecondary,
-            ),
+            style: TextStyle(fontSize: 16, color: context.textSecondary),
           ),
         ],
       ),

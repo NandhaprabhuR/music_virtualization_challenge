@@ -20,7 +20,8 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
   // Fallback: Playlist-based paging state (if search is geo-blocked)
   int _currentPlaylistIndex = 0;
   int _currentPageOffset = 0;
-  bool _useSearchMode = true; // Start with search API (task requirement)
+  bool _useSearchMode = true; // Search is primary (task requirement)
+  bool _searchGeoBlocked = false; // True if Deezer search returns empty data
 
   // All loaded tracks for local search filtering
   final List<Track> _allTracks = [];
@@ -56,13 +57,16 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
     _allTracks.clear();
     _groupedTracks.clear();
     _groupKeys.clear();
-    _useSearchMode = true;
+    _useSearchMode = true; // search is primary (task requirement)
+    _isFirstLoad = true;
+    _searchGeoBlocked = false;
+    _consecutiveEmptySearches = 0;
 
     try {
       final tracks = await _fetchNextBatch();
 
       if (tracks.isEmpty) {
-        // Search mode returned nothing (geo-blocked), try playlist fallback
+        // Try playlists as fallback if search is geo-blocked
         _useSearchMode = false;
         final fallbackTracks = await _fetchNextBatch();
         if (fallbackTracks.isEmpty) {
@@ -124,16 +128,28 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
       final newTracks = await _fetchNextBatch();
 
       if (newTracks.isEmpty) {
-        // Only mark as truly done if ALL queries are exhausted
-        final allQueriesDone = _useSearchMode
-            ? _currentQueryIndex >= ApiConstants.searchQueries.length
+        // If search exhausted or geo-blocked, switch to playlists
+        if (_useSearchMode) {
+          final searchDone =
+              _currentQueryIndex >= ApiConstants.searchQueries.length ||
+              _searchGeoBlocked;
+          if (searchDone) {
+            _useSearchMode = false;
+            // Don't mark as reached max — let playlist mode try
+            emit(currentState.copyWith(isLoadingMore: false));
+            return;
+          }
+        }
+
+        // Only mark as truly done if ALL sources are exhausted
+        final allDone = _useSearchMode
+            ? (_currentQueryIndex >= ApiConstants.searchQueries.length ||
+                      _searchGeoBlocked) &&
+                  _currentPlaylistIndex >= ApiConstants.playlistIds.length
             : _currentPlaylistIndex >= ApiConstants.playlistIds.length;
 
         emit(
-          currentState.copyWith(
-            isLoadingMore: false,
-            hasReachedMax: allQueriesDone,
-          ),
+          currentState.copyWith(isLoadingMore: false, hasReachedMax: allDone),
         );
         return;
       }
@@ -228,8 +244,8 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
   }
 
   /// Fetches the next batch of tracks.
-  /// In playlist mode: cycles through Deezer playlists.
-  /// In search mode (fallback): cycles through a-z, 0-9 queries.
+  /// In search mode (primary): cycles through a-z, 0-9 queries via Deezer Search API.
+  /// In playlist mode (fallback): cycles through Deezer playlists if search is geo-blocked.
   Future<List<Track>> _fetchNextBatch() async {
     if (_useSearchMode) {
       return _fetchFromSearch();
@@ -289,18 +305,66 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
     return batch;
   }
 
+  bool _isFirstLoad = true;
+
   /// Fetches tracks using Deezer search endpoint with paging.
-  /// Each scroll loads the next page from the current query letter.
-  /// When a query is exhausted, moves to the next letter (a→b→c→...→z→0→9).
+  /// First load: single fast API call so UI renders instantly.
+  /// Subsequent loads: fires 3 parallel API calls for throughput.
+  /// Detects geo-blocking (empty results) and sets _searchGeoBlocked.
+  int _consecutiveEmptySearches = 0;
+
   Future<List<Track>> _fetchFromSearch() async {
+    if (_searchGeoBlocked) return [];
+
     final List<Track> batch = [];
+
+    // ── FIRST LOAD: one fast call, return immediately ─────────────────
+    if (_isFirstLoad) {
+      _isFirstLoad = false;
+      if (_currentQueryIndex < ApiConstants.searchQueries.length) {
+        try {
+          final tracks = await getTracks(
+            query: ApiConstants.searchQueries[_currentQueryIndex],
+            index: _currentQueryOffset,
+            limit: ApiConstants.pageSize,
+          );
+          _currentQueryOffset += ApiConstants.pageSize;
+          if (tracks.isEmpty || tracks.length < ApiConstants.pageSize) {
+            _currentQueryIndex++;
+            _currentQueryOffset = 0;
+          }
+          for (final track in tracks) {
+            if (!_loadedTrackIds.contains(track.id)) {
+              _loadedTrackIds.add(track.id);
+              batch.add(track);
+            }
+          }
+          // Detect geo-blocking: if search returned 0 usable tracks
+          if (batch.isEmpty) {
+            _consecutiveEmptySearches++;
+            if (_consecutiveEmptySearches >= 2) {
+              _searchGeoBlocked = true;
+            }
+          } else {
+            _consecutiveEmptySearches = 0;
+          }
+        } on NoInternetException {
+          rethrow;
+        } catch (_) {
+          _currentQueryIndex++;
+          _currentQueryOffset = 0;
+        }
+      }
+      return batch;
+    }
+
+    // ── SUBSEQUENT LOADS: parallel calls for speed ────────────────────
     int apiCalls = 0;
-    int consecutiveErrors = 0;
+    const maxApiCalls = 9; // 3 rounds × 3 parallel = 9 total max
 
-    while (_currentQueryIndex < ApiConstants.searchQueries.length) {
-      final query = ApiConstants.searchQueries[_currentQueryIndex];
-
-      // If this query has been paged too deep, move to next
+    while (_currentQueryIndex < ApiConstants.searchQueries.length &&
+        apiCalls < maxApiCalls) {
+      // Skip exhausted queries
       if (_currentQueryOffset >=
           ApiConstants.maxPagesPerQuery * ApiConstants.pageSize) {
         _currentQueryIndex++;
@@ -308,58 +372,67 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
         continue;
       }
 
-      try {
-        apiCalls++;
+      final query = ApiConstants.searchQueries[_currentQueryIndex];
+      final offset = _currentQueryOffset;
 
-        final tracks = await getTracks(
-          query: query,
-          index: _currentQueryOffset,
-          limit: ApiConstants.pageSize,
+      // Fire up to 3 calls for consecutive pages of the same query
+      final List<Future<List<Track>>> futures = [];
+      final List<int> offsets = [];
+      for (int p = 0; p < 3 && apiCalls + p < maxApiCalls; p++) {
+        final o = offset + p * ApiConstants.pageSize;
+        if (o >= ApiConstants.maxPagesPerQuery * ApiConstants.pageSize) break;
+        offsets.add(o);
+        futures.add(
+          getTracks(
+            query: query,
+            index: o,
+            limit: ApiConstants.pageSize,
+          ).catchError((_) => <Track>[]),
         );
+      }
+      apiCalls += futures.length;
 
-        consecutiveErrors = 0; // reset on success
-        _currentQueryOffset += ApiConstants.pageSize;
+      if (futures.isEmpty) {
+        _currentQueryIndex++;
+        _currentQueryOffset = 0;
+        continue;
+      }
 
-        if (tracks.isEmpty) {
-          _currentQueryIndex++;
-          _currentQueryOffset = 0;
-          continue;
+      final results = await Future.wait(futures);
+
+      bool queryExhausted = false;
+      for (int i = 0; i < results.length; i++) {
+        final tracks = results[i];
+        if (tracks.isEmpty || tracks.length < ApiConstants.pageSize) {
+          queryExhausted = true;
         }
-
-        if (tracks.length < ApiConstants.pageSize) {
-          _currentQueryIndex++;
-          _currentQueryOffset = 0;
-        }
-
         for (final track in tracks) {
           if (!_loadedTrackIds.contains(track.id)) {
             _loadedTrackIds.add(track.id);
             batch.add(track);
           }
         }
-
-        // Got enough new tracks for this scroll? Return them.
-        if (batch.length >= 20) break;
-
-        // Safety: don't make too many calls in one scroll
-        if (apiCalls >= 15) break;
-      } on NoInternetException {
-        rethrow;
-      } catch (e) {
-        consecutiveErrors++;
-        // Don't permanently skip a query on CORS/network error.
-        // Just advance the offset so we try a different page next time.
-        _currentQueryOffset += ApiConstants.pageSize;
-        // If too many consecutive errors, move to next query
-        if (consecutiveErrors >= 3) {
-          _currentQueryIndex++;
-          _currentQueryOffset = 0;
-          consecutiveErrors = 0;
-        }
-        // Safety: stop if too many errors
-        if (apiCalls >= 15) break;
-        continue;
       }
+
+      if (queryExhausted) {
+        _currentQueryIndex++;
+        _currentQueryOffset = 0;
+      } else {
+        _currentQueryOffset = offsets.last + ApiConstants.pageSize;
+      }
+
+      // Got enough tracks? Return early.
+      if (batch.length >= 20) break;
+    }
+
+    // Detect geo-blocking after parallel fetches
+    if (batch.isEmpty && apiCalls > 0) {
+      _consecutiveEmptySearches++;
+      if (_consecutiveEmptySearches >= 2) {
+        _searchGeoBlocked = true;
+      }
+    } else if (batch.isNotEmpty) {
+      _consecutiveEmptySearches = 0;
     }
 
     return batch;

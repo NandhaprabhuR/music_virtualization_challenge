@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:untitled1/core/theme/app_theme.dart';
 
 class SearchBarWidget extends StatelessWidget {
@@ -23,10 +22,10 @@ class SearchBarWidget extends StatelessWidget {
         controller: controller,
         onChanged: onChanged,
         autofocus: false,
-        style: GoogleFonts.playfairDisplay(color: context.textPrimary),
+        style: TextStyle(color: context.textPrimary),
         decoration: InputDecoration(
           hintText: 'Search tracks, artists...',
-          hintStyle: GoogleFonts.playfairDisplay(color: context.textSecondary),
+          hintStyle: TextStyle(color: context.textSecondary),
           prefixIcon: Icon(Icons.search, color: context.textSecondary),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
