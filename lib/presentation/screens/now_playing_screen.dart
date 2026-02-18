@@ -123,8 +123,9 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
             detailState.lyrics!.syncedLyrics.isNotEmpty &&
             _cachedSyncedLines == null) {
           setState(() {
-            _cachedSyncedLines =
-                _parseSyncedLyrics(detailState.lyrics!.syncedLyrics);
+            _cachedSyncedLines = _parseSyncedLyrics(
+              detailState.lyrics!.syncedLyrics,
+            );
           });
         }
       });

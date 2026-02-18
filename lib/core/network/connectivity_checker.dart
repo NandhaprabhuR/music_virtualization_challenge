@@ -26,8 +26,9 @@ class ConnectivityCheckerImpl implements ConnectivityChecker {
   /// Performs a real DNS lookup to check if the device can reach the internet.
   Future<bool> _realReachabilityCheck() async {
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 3));
+      final result = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 3));
       return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
     } catch (_) {
       return false;
