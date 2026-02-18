@@ -26,9 +26,34 @@ class LyricsRemoteDatasourceImpl implements LyricsRemoteDatasource {
     required String albumName,
     required int duration,
   }) async {
+    // Primary: /api/get-cached (as required by the task spec)
+    try {
+      final cachedResponse = await dioClient.lrclibDio.get(
+        ApiConstants.lyricsCachedEndpoint,
+        queryParameters: {
+          'track_name': trackName,
+          'artist_name': artistName,
+          'album_name': albumName,
+          'duration': duration,
+        },
+      );
+
+      if (cachedResponse.statusCode == 200 && cachedResponse.data != null) {
+        final json = cachedResponse.data as Map<String, dynamic>;
+        final plain = json['plainLyrics'] as String? ?? '';
+        final synced = json['syncedLyrics'] as String? ?? '';
+        if (plain.isNotEmpty || synced.isNotEmpty) {
+          return LyricsModel.fromJson(json);
+        }
+      }
+    } catch (_) {
+      // Fall through to search endpoint
+    }
+
+    // Fallback: /api/search (broader results)
     try {
       final response = await dioClient.lrclibDio.get(
-        ApiConstants.lyricsEndpoint,
+        ApiConstants.lyricsSearchEndpoint,
         queryParameters: {'track_name': trackName, 'artist_name': artistName},
       );
 

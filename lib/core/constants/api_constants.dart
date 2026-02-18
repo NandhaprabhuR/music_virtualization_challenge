@@ -8,10 +8,11 @@ class ApiConstants {
 
   // LRCLIB API
   static const String lrclibBaseUrl = 'https://lrclib.net';
-  static const String lyricsEndpoint = '/api/search';
+  static const String lyricsCachedEndpoint = '/api/get-cached';
+  static const String lyricsSearchEndpoint = '/api/search';
 
   // Paging
-  static const int pageSize = 50;
+  static const int pageSize = 100;
 
   // Playlist-based loading (works globally, unlike /search which is geo-blocked)
   // We cycle through these playlists, paginating each one, to build the library.
@@ -98,6 +99,28 @@ class ApiConstants {
     '7',
     '8',
     '9',
+    // Tamil songs
+    'Anirudh',
+    'AR Rahman Tamil',
+    'Vijay Tamil song',
+    'Dhanush Tamil',
+    'Yuvan Shankar Raja',
+    'Sid Sriram Tamil',
+    'Ilaiyaraaja',
+    'Harris Jayaraj',
+    'Imman Tamil',
+    'GV Prakash',
+    // Hindi songs
+    'Arijit Singh',
+    'Pritam Hindi',
+    'Atif Aslam',
+    'Shreya Ghoshal',
+    'Neha Kakkar',
+    'Honey Singh',
+    'Lata Mangeshkar',
+    'Kishore Kumar',
+    'AR Rahman Hindi',
+    'Jubin Nautiyal',
   ];
 
   // Max pages per query character to avoid infinite fetching

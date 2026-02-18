@@ -13,20 +13,25 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
   final GetTracks getTracks;
   final SearchTracks searchTracks;
 
-  // Playlist-based paging state
-  int _currentPlaylistIndex = 0;
-  int _currentPageOffset = 0;
-
-  // Fallback: search-based paging state (if search endpoint works)
+  // Search-based paging state (primary: a-z queries as required by task)
   int _currentQueryIndex = 0;
   int _currentQueryOffset = 0;
-  bool _usePlaylistMode = true; // Start with playlists
+
+  // Fallback: Playlist-based paging state (if search is geo-blocked)
+  int _currentPlaylistIndex = 0;
+  int _currentPageOffset = 0;
+  bool _useSearchMode = true; // Start with search API (task requirement)
 
   // All loaded tracks for local search filtering
   final List<Track> _allTracks = [];
 
   // Set of track IDs to avoid duplicates
   final Set<int> _loadedTrackIds = {};
+
+  // Persistent grouped map — incrementally updated, never rebuilt from scratch
+  // during normal loading. This prevents the flat list from shifting.
+  final Map<String, List<Track>> _groupedTracks = {};
+  List<String> _groupKeys = [];
 
   LibraryBloc({required this.getTracks, required this.searchTracks})
     : super(const LibraryInitialState()) {
@@ -43,20 +48,22 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
   ) async {
     emit(const LibraryLoadingState());
 
-    _currentPlaylistIndex = 0;
-    _currentPageOffset = 0;
     _currentQueryIndex = 0;
     _currentQueryOffset = 0;
+    _currentPlaylistIndex = 0;
+    _currentPageOffset = 0;
     _loadedTrackIds.clear();
     _allTracks.clear();
-    _usePlaylistMode = true;
+    _groupedTracks.clear();
+    _groupKeys.clear();
+    _useSearchMode = true;
 
     try {
       final tracks = await _fetchNextBatch();
 
       if (tracks.isEmpty) {
-        // Playlist mode returned nothing, try search mode as fallback
-        _usePlaylistMode = false;
+        // Search mode returned nothing (geo-blocked), try playlist fallback
+        _useSearchMode = false;
         final fallbackTracks = await _fetchNextBatch();
         if (fallbackTracks.isEmpty) {
           emit(
@@ -70,12 +77,12 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
           return;
         }
         _allTracks.addAll(fallbackTracks);
-        final grouped = _groupTracks(_allTracks);
+        _appendToGroups(fallbackTracks);
         emit(
           LibraryLoadedState(
             tracks: List.unmodifiable(_allTracks),
-            groupedTracks: grouped,
-            groupKeys: grouped.keys.toList(),
+            groupedTracks: Map.unmodifiable(_groupedTracks),
+            groupKeys: List.unmodifiable(_groupKeys),
             totalLoaded: _allTracks.length,
           ),
         );
@@ -83,12 +90,12 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
       }
 
       _allTracks.addAll(tracks);
-      final grouped = _groupTracks(_allTracks);
+      _appendToGroups(tracks);
       emit(
         LibraryLoadedState(
           tracks: List.unmodifiable(_allTracks),
-          groupedTracks: grouped,
-          groupKeys: grouped.keys.toList(),
+          groupedTracks: Map.unmodifiable(_groupedTracks),
+          groupKeys: List.unmodifiable(_groupKeys),
           totalLoaded: _allTracks.length,
         ),
       );
@@ -117,18 +124,28 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
       final newTracks = await _fetchNextBatch();
 
       if (newTracks.isEmpty) {
-        emit(currentState.copyWith(isLoadingMore: false, hasReachedMax: true));
+        // Only mark as truly done if ALL queries are exhausted
+        final allQueriesDone = _useSearchMode
+            ? _currentQueryIndex >= ApiConstants.searchQueries.length
+            : _currentPlaylistIndex >= ApiConstants.playlistIds.length;
+
+        emit(
+          currentState.copyWith(
+            isLoadingMore: false,
+            hasReachedMax: allQueriesDone,
+          ),
+        );
         return;
       }
 
       _allTracks.addAll(newTracks);
-      final grouped = _groupTracks(_allTracks);
+      _appendToGroups(newTracks);
 
       emit(
         currentState.copyWith(
           tracks: List.unmodifiable(_allTracks),
-          groupedTracks: grouped,
-          groupKeys: grouped.keys.toList(),
+          groupedTracks: Map.unmodifiable(_groupedTracks),
+          groupKeys: List.unmodifiable(_groupKeys),
           isLoadingMore: false,
           totalLoaded: _allTracks.length,
         ),
@@ -151,37 +168,7 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
       return;
     }
 
-    // First try Deezer search API (works outside India)
-    emit(const LibraryLoadingState());
-
-    try {
-      final results = await searchTracks(
-        query: query,
-        index: 0,
-        limit: ApiConstants.pageSize,
-      );
-
-      if (results.isNotEmpty) {
-        // Search API works — use remote results
-        final grouped = _groupTracks(results);
-        emit(
-          LibraryLoadedState(
-            tracks: results,
-            groupedTracks: grouped,
-            groupKeys: grouped.keys.toList(),
-            isSearchMode: true,
-            searchQuery: query,
-            hasReachedMax: results.length < ApiConstants.pageSize,
-            totalLoaded: results.length,
-          ),
-        );
-        return;
-      }
-    } catch (_) {
-      // Search API failed/geo-blocked — fall through to local filter
-    }
-
-    // Fallback: filter locally from already-loaded tracks
+    // Always filter locally from already-loaded tracks (instant, no API call)
     final lowerQuery = query.toLowerCase();
     final filtered = _allTracks.where((t) {
       return t.title.toLowerCase().contains(lowerQuery) ||
@@ -197,7 +184,7 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
         groupKeys: grouped.keys.toList(),
         isSearchMode: true,
         searchQuery: query,
-        hasReachedMax: true, // local filter — no more pages
+        hasReachedMax: true,
         totalLoaded: filtered.length,
       ),
     );
@@ -227,12 +214,11 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
   ) async {
     // Restore full library view from already-loaded tracks
     if (_allTracks.isNotEmpty) {
-      final grouped = _groupTracks(_allTracks);
       emit(
         LibraryLoadedState(
           tracks: List.unmodifiable(_allTracks),
-          groupedTracks: grouped,
-          groupKeys: grouped.keys.toList(),
+          groupedTracks: Map.unmodifiable(_groupedTracks),
+          groupKeys: List.unmodifiable(_groupKeys),
           totalLoaded: _allTracks.length,
         ),
       );
@@ -245,10 +231,10 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
   /// In playlist mode: cycles through Deezer playlists.
   /// In search mode (fallback): cycles through a-z, 0-9 queries.
   Future<List<Track>> _fetchNextBatch() async {
-    if (_usePlaylistMode) {
-      return _fetchFromPlaylists();
-    } else {
+    if (_useSearchMode) {
       return _fetchFromSearch();
+    } else {
+      return _fetchFromPlaylists();
     }
   }
 
@@ -303,27 +289,46 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
     return batch;
   }
 
-  /// Fallback: fetches tracks using search endpoint (may be geo-blocked).
+  /// Fetches tracks using Deezer search endpoint with paging.
+  /// Each scroll loads the next page from the current query letter.
+  /// When a query is exhausted, moves to the next letter (a→b→c→...→z→0→9).
   Future<List<Track>> _fetchFromSearch() async {
     final List<Track> batch = [];
+    int apiCalls = 0;
+    int consecutiveErrors = 0;
 
-    while (batch.length < ApiConstants.pageSize &&
-        _currentQueryIndex < ApiConstants.searchQueries.length) {
+    while (_currentQueryIndex < ApiConstants.searchQueries.length) {
       final query = ApiConstants.searchQueries[_currentQueryIndex];
 
+      // If this query has been paged too deep, move to next
+      if (_currentQueryOffset >=
+          ApiConstants.maxPagesPerQuery * ApiConstants.pageSize) {
+        _currentQueryIndex++;
+        _currentQueryOffset = 0;
+        continue;
+      }
+
       try {
+        apiCalls++;
+
         final tracks = await getTracks(
           query: query,
           index: _currentQueryOffset,
           limit: ApiConstants.pageSize,
         );
 
-        if (tracks.isEmpty ||
-            _currentQueryOffset >=
-                ApiConstants.maxPagesPerQuery * ApiConstants.pageSize) {
+        consecutiveErrors = 0; // reset on success
+        _currentQueryOffset += ApiConstants.pageSize;
+
+        if (tracks.isEmpty) {
           _currentQueryIndex++;
           _currentQueryOffset = 0;
           continue;
+        }
+
+        if (tracks.length < ApiConstants.pageSize) {
+          _currentQueryIndex++;
+          _currentQueryOffset = 0;
         }
 
         for (final track in tracks) {
@@ -333,17 +338,26 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
           }
         }
 
-        _currentQueryOffset += ApiConstants.pageSize;
+        // Got enough new tracks for this scroll? Return them.
+        if (batch.length >= 20) break;
 
-        if (tracks.length < ApiConstants.pageSize) {
-          _currentQueryIndex++;
-          _currentQueryOffset = 0;
-        }
+        // Safety: don't make too many calls in one scroll
+        if (apiCalls >= 15) break;
       } on NoInternetException {
         rethrow;
       } catch (e) {
-        _currentQueryIndex++;
-        _currentQueryOffset = 0;
+        consecutiveErrors++;
+        // Don't permanently skip a query on CORS/network error.
+        // Just advance the offset so we try a different page next time.
+        _currentQueryOffset += ApiConstants.pageSize;
+        // If too many consecutive errors, move to next query
+        if (consecutiveErrors >= 3) {
+          _currentQueryIndex++;
+          _currentQueryOffset = 0;
+          consecutiveErrors = 0;
+        }
+        // Safety: stop if too many errors
+        if (apiCalls >= 15) break;
         continue;
       }
     }
@@ -351,8 +365,24 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
     return batch;
   }
 
+  /// Incrementally appends new tracks to the persistent grouped map.
+  /// New tracks are added at the END of their respective group lists,
+  /// and new groups are inserted in sorted order. This prevents
+  /// existing items from shifting positions in the flat list.
+  void _appendToGroups(List<Track> newTracks) {
+    for (final track in newTracks) {
+      final letter = track.groupLetter;
+      if (!_groupedTracks.containsKey(letter)) {
+        _groupedTracks[letter] = [];
+        // Insert the new key in sorted position
+        _groupKeys = _sortedKeys(_groupedTracks.keys);
+      }
+      _groupedTracks[letter]!.add(track);
+    }
+  }
+
   /// Groups tracks by first letter of title (A-Z, # for non-alpha).
-  /// Returns a sorted map.
+  /// Used only for search results (one-shot, not incremental).
   Map<String, List<Track>> _groupTracks(List<Track> tracks) {
     final Map<String, List<Track>> grouped = {};
 
@@ -362,14 +392,18 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
       grouped[letter]!.add(track);
     }
 
-    // Sort keys: A-Z first, then #
-    final sortedKeys = grouped.keys.toList()
+    final sortedKeys = _sortedKeys(grouped.keys);
+    return {for (final key in sortedKeys) key: grouped[key]!};
+  }
+
+  /// Returns keys sorted A-Z with # at the end.
+  List<String> _sortedKeys(Iterable<String> keys) {
+    final list = keys.toList()
       ..sort((a, b) {
         if (a == '#') return 1;
         if (b == '#') return -1;
         return a.compareTo(b);
       });
-
-    return {for (final key in sortedKeys) key: grouped[key]!};
+    return list;
   }
 }
