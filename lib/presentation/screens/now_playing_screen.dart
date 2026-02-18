@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -99,6 +101,8 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
   late TabController _tabController;
   final ScrollController _lyricsScrollController = ScrollController();
   int _currentLyricIndex = -1;
+  List<_SyncedLine>? _cachedSyncedLines;
+  StreamSubscription<AudioPlayerState>? _audioSub;
 
   @override
   void initState() {
@@ -109,10 +113,28 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
         context.read<AudioPlayerCubit>().playUrl(widget.track.preview);
       });
     }
+    // Listen to audio position changes for synced lyrics
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _audioSub = context.read<AudioPlayerCubit>().stream.listen((audioState) {
+        if (!mounted) return;
+        if (_cachedSyncedLines != null && _cachedSyncedLines!.isNotEmpty) {
+          final newIndex = _findCurrentLineIndex(_cachedSyncedLines!, audioState.position);
+          if (newIndex != _currentLyricIndex) {
+            setState(() {
+              _currentLyricIndex = newIndex;
+            });
+            if (newIndex >= 0) {
+              _scrollToLine(newIndex);
+            }
+          }
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
+    _audioSub?.cancel();
     _tabController.dispose();
     _lyricsScrollController.dispose();
     super.dispose();
@@ -775,7 +797,8 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
   }
 
   Widget _buildSyncedLyricsView(BuildContext context, String syncedLyrics) {
-    final syncedLines = _parseSyncedLyrics(syncedLyrics);
+    _cachedSyncedLines ??= _parseSyncedLyrics(syncedLyrics);
+    final syncedLines = _cachedSyncedLines!;
     if (syncedLines.isEmpty) {
       return Center(
         child: Text(
@@ -788,50 +811,37 @@ class _NowPlayingContentState extends State<_NowPlayingContent>
       );
     }
 
-    return BlocBuilder<AudioPlayerCubit, AudioPlayerState>(
-      builder: (context, audioState) {
-        final currentIndex = _findCurrentLineIndex(
-          syncedLines,
-          audioState.position,
-        );
-        if (currentIndex != _currentLyricIndex && currentIndex >= 0) {
-          _currentLyricIndex = currentIndex;
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => _scrollToLine(currentIndex),
-          );
-        }
+    final currentIndex = _currentLyricIndex;
 
-        return ListView.builder(
-          controller: _lyricsScrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-          itemCount: syncedLines.length,
-          itemBuilder: (context, index) {
-            final line = syncedLines[index];
-            final isActive = index == currentIndex;
-            final isPast = index < currentIndex;
-            if (line.text.isEmpty) return const SizedBox(height: 24);
-            return GestureDetector(
-              onTap: () => context.read<AudioPlayerCubit>().seekTo(line.time),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 300),
-                  style: GoogleFonts.playfairDisplay(
-                    color: isActive
-                        ? context.accent
-                        : isPast
+    return ListView.builder(
+      controller: _lyricsScrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+      itemCount: syncedLines.length,
+      itemBuilder: (context, index) {
+        final line = syncedLines[index];
+        final isActive = index == currentIndex;
+        final isPast = index < currentIndex;
+        if (line.text.isEmpty) return const SizedBox(height: 24);
+        return GestureDetector(
+          onTap: () => context.read<AudioPlayerCubit>().seekTo(line.time),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 300),
+              style: GoogleFonts.playfairDisplay(
+                color: isActive
+                    ? context.accent
+                    : isPast
                         ? context.textPrimary.withValues(alpha: 0.35)
                         : context.textPrimary.withValues(alpha: 0.6),
-                    fontSize: isActive ? 26 : 20,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                    height: 1.4,
-                  ),
-                  child: Text(line.text),
-                ),
+                fontSize: isActive ? 26 : 20,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                height: 1.4,
               ),
-            );
-          },
+              child: Text(line.text),
+            ),
+          ),
         );
       },
     );
