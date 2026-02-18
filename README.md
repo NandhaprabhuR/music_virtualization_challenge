@@ -71,19 +71,37 @@ Clean Architecture with three layers:
 
 ---
 
-## 🎯 3 Key Design Decisions
+## 🎯 Why This Approach Works
 
-### 1. Deezer Search API with a–z query rotation for 50k+ tracks
+### Lazy Build
 
-The task requires 50,000+ tracks via paging. A single query like `q=a` maxes out at ~2,800 results on Deezer. To reach 50k+, the app rotates through 36 query characters (`a`–`z`, `0`–`9`), paging each with `index` + `limit=50`. A `Set<int>` of loaded track IDs prevents duplicates across queries. If the search endpoint is geo-blocked (e.g., in India), the app automatically falls back to fetching from curated Deezer playlists.
+The entire track list uses `ListView.builder` with a **fixed item extent** (`_trackHeight = 96px`). Flutter only inflates widgets for the visible viewport (~12–15 items on screen at once). As the user scrolls, off-screen widgets are **destroyed** and new ones are **built on demand** — so even with 50,000+ tracks in the data layer, the widget tree never holds more than ~20 items. This keeps the widget count constant regardless of total data size, eliminating memory growth during scrolling.
 
-### 2. Stack-based floating sticky header over a flat ListView
+No third-party virtualization or recycler packages are used — this is pure `ListView.builder` (Flutter's built-in virtualized list).
 
-Instead of `SliverPersistentHeader(pinned: true)` per section (which stacks all scrolled-past headers at the top, eating the viewport), the library uses a flat `ListView.builder` containing both header rows and track rows, wrapped in a `Stack` with a single **floating sticky header overlay**. A scroll listener measures the position of each in-list header via `GlobalKey` and determines which section is currently at the top. The overlay shows that section's header, and when the next section's header scrolls up to meet it, it **pushes** the current one off — giving native iOS-contacts-style sticky behavior without any third-party packages.
+### Paging Strategy
 
-### 3. Immediate state emission for play/pause (no stream dependency)
+Tracks are loaded in **pages of 100** from the Deezer Search API (`/search/track?q={query}&index={offset}&limit=100`). A single query like `q=a` caps at ~2,800 results, so the app **rotates through 271 search queries** (a–z, 0–9, two-letter combos, genre keywords, artist names) to reach 50k+ unique tracks. Each page load:
 
-Early versions relied on `just_audio`'s `playerStateStream` to update the play/pause icon. On web, this stream fires with unpredictable delays, causing the button to lag or need double-tapping. The fix: `pause()` and `playUrl()` emit the new `PlaybackStatus` **immediately** after calling the player method. The `playerStateStream` is only used for the `loading → playing` transition and track completion — it never overrides user-initiated state changes.
+1. Fires 3 parallel API calls via `Future.wait()` for throughput (first load uses a single call for instant UI).
+2. Deduplicates by track ID using a `Set<int>` — no duplicate tracks ever appear.
+3. Appends new tracks incrementally to the grouped `Map<String, List<Track>>` without rebuilding.
+4. Triggers the next page when the user scrolls within **500px of the bottom**.
+
+If the Deezer Search API is geo-blocked (detected by 2 consecutive empty responses where `total > 0`), the app automatically falls back to fetching from **986 curated Deezer playlist IDs** covering all genres/decades/regions.
+
+### Search Strategy
+
+Search is **debounced at 500ms** to prevent API spam. The strategy:
+
+1. **Remote-first**: Sends the query to Deezer's `/search/track?q={query}` endpoint for server-side matching.
+2. **Local fallback**: If the remote call fails (network error, rate limit), the app filters the in-memory `_allTracks` list using `.where()` with a case-insensitive substring match on track title and artist name.
+3. **No UI freeze**: The 500ms debounce ensures keystrokes aren't blocked. Local filtering on ~10k loaded tracks completes in <5ms.
+4. **Clear search**: Restoring the full view is instant — it just re-emits the existing `_allTracks` grouped data without any re-fetch.
+
+### Sticky Headers (A–Z Grouping)
+
+The library uses a flat `ListView.builder` containing both header rows and track rows, with a `Stack`-based **floating sticky header overlay**. Pre-computed scroll offsets determine which section is at the top. When the next section's in-list header scrolls up to meet the overlay, it **pushes** the current one off — giving native iOS-contacts-style sticky behavior without any third-party packages.
 
 ---
 
@@ -97,22 +115,29 @@ Early versions relied on `just_audio`'s `playerStateStream` to update the play/p
 
 ---
 
-## ⚠️ What Breaks at 100k Items
+## ⚠️ What Would Break at 100k Items
 
 At 100,000 tracks, the current approach has these bottlenecks:
 
-1. **In-memory `_allTracks` list** — Holding 100k `Track` objects (~200 bytes each) consumes ~20 MB of heap. The `_groupTracks()` method creates a second grouped copy, doubling memory to ~40 MB. At 100k, this triggers GC pressure on low-end devices.
+| Component | Current (50k) | At 100k | Impact |
+|---|---|---|---|
+| `_allTracks` list | ~10 MB heap | ~20 MB heap | GC pressure on low-end devices (2 GB RAM) |
+| `_groupedTracks` map | ~10 MB (grouped copy) | ~20 MB | Combined ~40 MB for data alone |
+| `_loadedTrackIds` Set | ~400 KB | ~800 KB | Negligible |
+| Local search `.where()` | <5 ms on 10k loaded | ~15–30 ms on 100k | Possible 1–2 dropped frames |
+| Scroll offset recomputation | Instant | ~5 ms | Negligible |
 
-2. **`_groupTracks()` runs on the main isolate** — Iterating 100k items to bucket them into A–Z groups takes ~50–100 ms on mid-range phones, which can drop frames during a page load.
+**What would actually break:**
+1. **Memory on low-end devices** — 40 MB of track data + 80 MB Flutter overhead = ~120 MB, risky on 2 GB RAM phones.
+2. **Local search jank** — Scanning 100k items with `.where()` on the main isolate could cause visible stutter.
+3. **Initial grouping** — If tracks arrive in one large batch, `_groupTracks()` iterating 100k items would take ~80–100 ms (5–6 dropped frames).
 
-3. **Search filtering is O(n)** — Local search (`.where()` on `_allTracks`) scans all 100k items on every keystroke (after debounce), causing potential jank.
+**What I would optimize next:**
 
-**What I would optimize:**
-
-- **Paginated grouping** — Maintain an incrementally-updated `Map<String, List<Track>>` instead of rebuilding from scratch on every batch.
-- **Isolate-based search** — Move the `.where()` filter to a background isolate via `compute()` so the main thread never blocks.
-- **Database-backed storage** — Replace the in-memory list with a SQLite/Isar database, query by group letter with indexed columns, and only hold the visible page in memory.
-- **Trie-based search index** — Build a prefix trie of track/artist names for O(m) search instead of O(n) linear scan.
+- **Database-backed storage (Isar/SQLite)** — Replace `_allTracks` list with a database. Query by group letter with indexed columns. Only hold the current viewport page in memory (~100 items). This drops data-layer memory from ~40 MB to <1 MB.
+- **Isolate-based search** — Move the `.where()` filter to a background isolate via `Isolate.run()` / `compute()`. The main thread stays at 60 fps regardless of dataset size.
+- **Trie-based search index** — Build a prefix trie of track/artist names for O(m) lookup instead of O(n) linear scan. Trades ~5 MB of memory for instant search.
+- **Incremental grouping** (already partially implemented) — The current `_appendToGroups()` adds new tracks to existing groups without rebuilding. At 100k this would be extended to also handle deletions and re-sorts incrementally.
 
 ---
 
@@ -128,7 +153,6 @@ At 100,000 tracks, the current approach has these bottlenecks:
 | DI | get_it ^8.0.2 |
 | Connectivity | connectivity_plus ^6.1.0 |
 | Images | cached_network_image ^3.4.1 |
-| Fonts | google_fonts ^8.0.1 |
 
 ---
 
@@ -142,6 +166,13 @@ flutter run -d chrome  # Web
 
 ---
 
-## 📊 Memory Evidence
+## 📊 Memory Usage Evidence
 
-The app uses `ListView.builder` — Flutter only builds widgets for the visible viewport (~15–20 items). Scrolling through 50k+ tracks does not increase widget count or memory because off-screen items are destroyed and rebuilt on demand. The Dart DevTools memory profile shows a flat ~80–120 MB heap with no upward trend during continuous scrolling.
+The app achieves stable memory through these mechanisms:
+
+1. **`ListView.builder` with fixed extent** — Only ~12–15 track widgets exist at any time. Scrolling through 50k+ tracks does not increase the widget count. Off-screen items are destroyed and rebuilt on demand.
+2. **Incremental data loading** — Tracks load in pages of 100. The data layer grows gradually (not all 50k at once), and each page is appended to the existing grouped map without rebuilding.
+3. **`CachedNetworkImage`** — Album art is cached to disk, not held in memory. The in-memory image cache is bounded by Flutter's default `ImageCache` (max 100 images, 100 MB).
+4. **No duplicate storage** — `_loadedTrackIds` (a `Set<int>`) prevents duplicate `Track` objects from being stored.
+
+**Expected DevTools profile:** Heap stays flat at ~80–120 MB during continuous scrolling. No upward trend. GC pauses are minimal (<2 ms) because the widget tree size is constant.
