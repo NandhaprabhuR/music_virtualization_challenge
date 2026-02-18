@@ -40,69 +40,87 @@ class AudioPlayerState extends Equatable {
 class AudioPlayerCubit extends Cubit<AudioPlayerState> {
   final AudioPlayer _player = AudioPlayer();
   String? _currentUrl;
+  bool _isLoadingUrl = false;
 
   AudioPlayerCubit() : super(const AudioPlayerState()) {
     _player.positionStream.listen((pos) {
       if (!isClosed) {
-        emit(state.copyWith(position: pos));
+        emit(
+          AudioPlayerState(
+            status: state.status,
+            position: pos,
+            duration: state.duration,
+            error: state.error,
+          ),
+        );
       }
     });
 
     _player.durationStream.listen((dur) {
       if (!isClosed && dur != null) {
-        emit(state.copyWith(duration: dur));
+        emit(
+          AudioPlayerState(
+            status: state.status,
+            position: state.position,
+            duration: dur,
+            error: state.error,
+          ),
+        );
       }
     });
 
     _player.playerStateStream.listen((playerState) {
       if (isClosed) return;
 
+      // Handle track completion
       if (playerState.processingState == ProcessingState.completed) {
+        _player.seek(Duration.zero);
+        _player.pause();
         emit(
           state.copyWith(
             status: PlaybackStatus.paused,
             position: Duration.zero,
           ),
         );
-        _player.seek(Duration.zero);
-        _player.pause();
         return;
       }
 
-      // Sync play/pause state from native player
-      if (playerState.processingState == ProcessingState.ready) {
-        if (playerState.playing && state.status == PlaybackStatus.paused) {
-          emit(state.copyWith(status: PlaybackStatus.playing));
-        } else if (!playerState.playing &&
-            state.status == PlaybackStatus.playing) {
-          emit(state.copyWith(status: PlaybackStatus.paused));
-        }
+      // Only use stream to transition loading → playing
+      // (pause/resume are handled immediately by pause()/playUrl())
+      if (playerState.processingState == ProcessingState.ready &&
+          playerState.playing &&
+          state.status == PlaybackStatus.loading) {
+        emit(state.copyWith(status: PlaybackStatus.playing));
       }
     });
   }
 
   Future<void> playUrl(String url) async {
-    if (url.isEmpty) return;
+    if (url.isEmpty || _isLoadingUrl) return;
 
     try {
+      // Resume same track
       if (_currentUrl == url && state.status == PlaybackStatus.paused) {
-        await _player.play();
+        _player.play();
         emit(state.copyWith(status: PlaybackStatus.playing));
         return;
       }
 
+      // New track - stop current, load new
+      _isLoadingUrl = true;
       emit(state.copyWith(status: PlaybackStatus.loading));
       _currentUrl = url;
 
+      await _player.stop();
       await _player.setUrl(url);
-      await _player.play();
+      _player.play();
       emit(state.copyWith(status: PlaybackStatus.playing));
     } catch (e) {
-      // Retry once on failure (Deezer preview URLs can return 403 transiently)
+      // Retry once
       try {
         await Future.delayed(const Duration(milliseconds: 500));
         await _player.setUrl(url);
-        await _player.play();
+        _player.play();
         emit(state.copyWith(status: PlaybackStatus.playing));
       } catch (_) {
         emit(
@@ -112,6 +130,8 @@ class AudioPlayerCubit extends Cubit<AudioPlayerState> {
           ),
         );
       }
+    } finally {
+      _isLoadingUrl = false;
     }
   }
 
@@ -121,8 +141,12 @@ class AudioPlayerCubit extends Cubit<AudioPlayerState> {
   }
 
   void togglePlayPause(String url) {
-    if (state.isPlaying) {
+    if (_isLoadingUrl) return;
+    if (state.status == PlaybackStatus.playing) {
       pause();
+    } else if (state.status == PlaybackStatus.paused && _currentUrl == url) {
+      _player.play();
+      emit(state.copyWith(status: PlaybackStatus.playing));
     } else {
       playUrl(url);
     }
