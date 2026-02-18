@@ -20,6 +20,7 @@ import 'package:untitled1/presentation/blocs/connectivity/connectivity_cubit.dar
 import 'package:untitled1/presentation/blocs/library/library_bloc.dart';
 import 'package:untitled1/presentation/blocs/audio/audio_player_cubit.dart';
 import 'package:untitled1/presentation/blocs/now_playing/now_playing_cubit.dart';
+import 'package:untitled1/presentation/blocs/theme/theme_cubit.dart';
 import 'package:untitled1/presentation/screens/home_screen.dart';
 
 final getIt = GetIt.instance;
@@ -104,14 +105,19 @@ class MyApp extends StatelessWidget {
         ),
         BlocProvider<NowPlayingCubit>(create: (_) => NowPlayingCubit()),
         BlocProvider<AudioPlayerCubit>(create: (_) => AudioPlayerCubit()),
+        BlocProvider<ThemeCubit>(create: (_) => ThemeCubit()),
       ],
-      child: MaterialApp(
-        title: 'Music Library',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme(),
-        darkTheme: AppTheme.darkTheme(),
-        themeMode: ThemeMode.system,
-        home: const HomeScreen(),
+      child: BlocBuilder<ThemeCubit, ThemeMode>(
+        builder: (context, themeMode) {
+          return MaterialApp(
+            title: 'Music Library',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme(),
+            darkTheme: AppTheme.darkTheme(),
+            themeMode: themeMode,
+            home: const HomeScreen(),
+          );
+        },
       ),
     );
   }

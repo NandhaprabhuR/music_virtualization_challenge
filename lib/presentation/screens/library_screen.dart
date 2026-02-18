@@ -6,6 +6,7 @@ import 'package:untitled1/core/utils/debouncer.dart';
 import 'package:untitled1/domain/entities/track.dart';
 import 'package:untitled1/presentation/blocs/connectivity/connectivity_cubit.dart';
 import 'package:untitled1/presentation/blocs/library/library_bloc.dart';
+import 'package:untitled1/presentation/blocs/theme/theme_cubit.dart';
 import 'package:untitled1/presentation/blocs/library/library_event.dart';
 import 'package:untitled1/presentation/blocs/library/library_state.dart';
 import 'package:untitled1/presentation/blocs/now_playing/now_playing_cubit.dart';
@@ -157,6 +158,24 @@ class _LibraryScreenState extends State<LibraryScreen>
                 );
               }
               return const SizedBox.shrink();
+            },
+          ),
+          // Theme toggle
+          BlocBuilder<ThemeCubit, ThemeMode>(
+            builder: (context, themeMode) {
+              return IconButton(
+                onPressed: () => context.read<ThemeCubit>().toggleTheme(),
+                icon: Icon(
+                  themeMode == ThemeMode.dark
+                      ? Icons.wb_sunny_rounded
+                      : Icons.nightlight_round,
+                  color: context.accent,
+                  size: 22,
+                ),
+                tooltip: themeMode == ThemeMode.dark
+                    ? 'Switch to Light Mode'
+                    : 'Switch to Dark Mode',
+              );
             },
           ),
           // Connectivity indicator
