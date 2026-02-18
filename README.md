@@ -12,7 +12,7 @@ A Flutter music library app that renders and interacts with **50,000+ tracks** s
 - **Track detail screen** with full metadata (BPM, contributors, release date, etc.)
 - **Synced lyrics** with real-time word-by-word highlighting and auto-scroll
 - **Audio preview playback** with play/pause, seek, and progress bar
-- **Mini-player bar** (Apple Music style) persistent across screens
+- **Mini-player bar**  persistent across screens
 - **Light / Dark theme toggle**
 - **Offline handling** — shows `NO INTERNET CONNECTION` on network failure
 - **Hive local caching** for previously loaded tracks
